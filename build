@@ -1,0 +1,3 @@
+#!/bin/bash
+g++ ledger.cpp json/*.cpp -I. -lcurl -o ledger.pretty
+g++ -DCOMPACT ledger.cpp json/*.cpp -I. -lcurl -o ledger.compact
