@@ -7,6 +7,13 @@
 
 // This is very quick and dirty code to retrieve a ledger
 // by sequence number from the S2 full history cluster
+#ifndef RPC_URL
+#define RPC_URL "http://s2.ripple.com:51234"
+#endif
+
+// When compiling, define "COMPACT" if you want your JSON
+// to be as short as possible instead of being neatly
+// spaced and indented.
 
 char *out_buf;
 
@@ -82,7 +89,7 @@ void writeJson(std::ofstream& f, int step, Json::Value const &v)
 // Execute a query against the S2 cluster of full history XRP Ledger notes.
 // Note that this is a best-effort service that does not guarantee
 // any particular level of reliability.
-bool do_query (std::string const& method, Json::Value const& params, Json::Value& reply)
+bool do_query_i (std::string const& method, Json::Value const& params, Json::Value& reply)
 {
     std::string q;
 
@@ -105,7 +112,7 @@ bool do_query (std::string const& method, Json::Value const& params, Json::Value
     ud.so_far = 0;
 
     CURLcode code;
-    code = curl_easy_setopt (c, CURLOPT_URL, "http://s2.ripple.com:51234");
+    code = curl_easy_setopt (c, CURLOPT_URL, RPC_URL);
     code = curl_easy_setopt (c, CURLOPT_POSTFIELDSIZE, q.size());
     code = curl_easy_setopt (c, CURLOPT_POSTFIELDS, q.c_str());
     code = curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, write_callback);
@@ -137,12 +144,26 @@ bool do_query (std::string const& method, Json::Value const& params, Json::Value
     if (!status.isString() || (status.asString() != "success"))
     {
         fprintf(stderr, "Result is '%s', not success\n", status.asString().c_str());
+        fprintf(stderr, "\n%s\n", out_buf);
         reply = result;
         return false;
     }
 
     reply = std::move (root);
     return true;
+}
+
+bool do_query(std::string const& method, Json::Value const& params, Json::Value& reply)
+{
+    for (int i = 0; i < 10; ++i)
+    {
+        if (do_query_i (method, params, reply))
+            return true;
+        std::cout << "\x8" << i + 1 << "\x8" << std::flush;
+        sleep (i + 2);
+        std::cout << "\x8 \x8" << std::flush;
+    }
+    return false;
 }
 
 // Get the header of a ledger given its sequence number
@@ -238,9 +259,6 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // When compiling, define "COMPACT" if you want your JSON
-    // to be as short as possible instead of being neatly
-    // spaced and indented. 
 #ifdef COMPACT
     setCompact();
 #endif
